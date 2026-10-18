@@ -1,74 +1,211 @@
-// Pega o formulário pelo ID que coloquei no HTML
-const formulario = document.getElementById("formMangas");
-// Pega o lugar onde a tabela vai aparecer
-const resultado = document.getElementById("resultado");
-// Pega o lugar onde vai mostrar mensagens para o usuário
-const mensagem = document.getElementById("mensagem");
 
+// BUSCA DE MANGÁS COM A API OPEN LIBRARY
 
-// Essa função busca os mangás no PHP e mostra eles na página
-function carregarMangas() {
+const formBusca = document.getElementById("formBusca");
+const campoBusca = document.getElementById("nomeManga");
+const listaMangas = document.getElementById("mangas");
+const mensagemBusca = document.getElementById("mensagemBusca");
+const botaoBuscar = document.getElementById("botaoBuscar");
 
-    // Faz uma requisição para o index.php
-    fetch("index.php")
-        .then(resposta => {
-            // Se der algum erro na resposta, mostra um erro
-            if (!resposta.ok) {
-                throw new Error("Não foi possível carregar os mangás.");
+// Buscar mangás na API
+async function buscarMangas(evento) {
+    evento.preventDefault();
+
+    const nome = campoBusca.value.trim();
+
+    listaMangas.innerHTML = "";
+    mensagemBusca.textContent = "";
+
+    if (nome === "") {
+        mensagemBusca.textContent = "Digite o nome de um mangá!";
+        return;
+    }
+
+    botaoBuscar.disabled = true;
+    botaoBuscar.textContent = "Buscando...";
+    mensagemBusca.textContent = "Procurando mangás...";
+
+    try {
+        // Nova API: Open Library
+        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(nome)}&fields=key,title,author_name,cover_i,first_publish_year&limit=6`;
+
+        const resposta = await fetch(url);
+
+        if (!resposta.ok) {
+            throw new Error("Erro na requisição");
+        }
+
+        // Converter a resposta em JSON
+        const dados = await resposta.json();
+
+        listaMangas.innerHTML = "";
+        mensagemBusca.textContent = "";
+
+        // Verificar se encontrou resultados
+        if (!dados.docs || dados.docs.length === 0) {
+            mensagemBusca.textContent = "Nenhum mangá encontrado!";
+            return;
+        }
+
+        // Criar os cards
+        dados.docs.forEach(manga => {
+            const card = document.createElement("div");
+            card.classList.add("card-manga");
+
+            // Capa
+            if (manga.cover_i) {
+                const imagem = document.createElement("img");
+
+                imagem.src = `https://covers.openlibrary.org/b/id/${manga.cover_i}-M.jpg`;
+                imagem.alt = `Capa de ${manga.title}`;
+                imagem.loading = "lazy";
+
+                card.appendChild(imagem);
             }
-            // Transforma a resposta em texto
-            return resposta.text();
-        })
 
-        .then(dados => {
+            // Título
+            const titulo = document.createElement("h3");
+            titulo.textContent = manga.title;
 
-            // Coloca a tabela que veio do PHP dentro da div resultado
-            resultado.innerHTML = dados;
+            // Autor
+            const autor = document.createElement("p");
+            autor.textContent = "Autor: " +
+                (manga.author_name?.join(", ") || "Não informado");
 
-        })
+            // Ano
+            const ano = document.createElement("p");
+            ano.textContent = "Ano: " +
+                (manga.first_publish_year || "Não informado");
 
-        .catch(erro => {
+            card.appendChild(titulo);
+            card.appendChild(autor);
+            card.appendChild(ano);
 
-            // Se der erro, mostra uma mensagem na página
-            resultado.innerHTML = "<p>Erro ao carregar os mangás.</p>";
-            // Mostro o erro no console para ajudar a identificar o problema
-            console.error(erro);
+            listaMangas.appendChild(card);
         });
+
+    } catch (erro) {
+        console.error("Erro na API:", erro);
+
+        mensagemBusca.textContent =
+            "Não foi possível realizar a pesquisa. Tente novamente.";
+
+    } finally {
+        // Ativar o botão novamente
+        botaoBuscar.disabled = false;
+        botaoBuscar.textContent = "Buscar mangás";
+    }
+}
+
+// Ativar busca
+if (formBusca) {
+    formBusca.addEventListener("submit", buscarMangas);
 }
 
 
-// Aqui espera o usuário enviar o formulário
-formulario.addEventListener("submit", function (evento) {
+// CADASTRO DE MANGÁS
 
-    // Impede o comportamento padrão de recarregar a página
-    evento.preventDefault();
-    // Pega todos os dados preenchidos no formulário
-    const dadosFormulario = new FormData(formulario);
+const formMangas = document.getElementById("formMangas");
+const resultado = document.getElementById("resultado");
+const mensagemCadastro = document.getElementById("mensagemCadastro");
 
-    // Envia esses dados para o salvar.php
-    fetch("php/salvar.php", {
-        method: "POST",
-        body: dadosFormulario
-    })
+// Recuperar mangás salvos
+let mangasCadastrados = [];
 
-        .then(resposta => resposta.text())
-        .then(() => {
+try {
+    mangasCadastrados = JSON.parse(
+        localStorage.getItem("mangasCadastrados") || "[]"
+    );
+} catch (erro) {
+    console.error("Erro ao carregar mangás:", erro);
+    mangasCadastrados = [];
+}
 
-            // Limpa os campos depois do cadastro
-            formulario.reset();
-            mensagem.textContent = "Mangá cadastrado com sucesso!";
-            // Atualiza a lista para mostrar o novo mangá
-            carregarMangas();
-        })
+// Salvar mangás no navegador
+function salvarMangas() {
+    localStorage.setItem(
+        "mangasCadastrados",
+        JSON.stringify(mangasCadastrados)
+    );
+}
 
-        .catch(erro => {
+// Mostrar mangás cadastrados
+function mostrarMangas() {
+    if (!resultado) {
+        return;
+    }
 
-            // Caso aconteça algum problema no cadastro
-            mensagem.textContent = "Não foi possível cadastrar o mangá.";
-            console.error(erro);
+    resultado.innerHTML = "";
+
+    if (mangasCadastrados.length === 0) {
+        resultado.textContent = "Nenhum mangá cadastrado ainda.";
+        return;
+    }
+
+    mangasCadastrados.forEach((manga, indice) => {
+        const card = document.createElement("div");
+        card.classList.add("manga-cadastrado");
+
+        const titulo = document.createElement("h3");
+        titulo.textContent = manga.nome;
+
+        const autor = document.createElement("p");
+        autor.textContent = `Autor: ${manga.autor}`;
+
+        const genero = document.createElement("p");
+        genero.textContent = `Gênero: ${manga.genero}`;
+
+        const volumes = document.createElement("p");
+        volumes.textContent = `Volumes: ${manga.volumes}`;
+
+        // Botão excluir
+        const botaoExcluir = document.createElement("button");
+        botaoExcluir.textContent = "Excluir";
+        botaoExcluir.classList.add("botao-excluir");
+
+        botaoExcluir.addEventListener("click", () => {
+            mangasCadastrados.splice(indice, 1);
+            salvarMangas();
+            mostrarMangas();
         });
-});
 
+        card.appendChild(titulo);
+        card.appendChild(autor);
+        card.appendChild(genero);
+        card.appendChild(volumes);
+        card.appendChild(botaoExcluir);
 
-// Quando a página abre, já carrega os mangás cadastrados
-carregarMangas();
+        resultado.appendChild(card);
+    });
+}
+
+// Cadastrar um mangá
+function cadastrarManga(evento) {
+    evento.preventDefault();
+
+    const manga = {
+        nome: document.getElementById("nome").value.trim(),
+        autor: document.getElementById("autor").value.trim(),
+        genero: document.getElementById("genero").value.trim(),
+        volumes: document.getElementById("volumes").value
+    };
+
+    mangasCadastrados.push(manga);
+
+    salvarMangas();
+    mostrarMangas();
+
+    mensagemCadastro.textContent = "Mangá cadastrado com sucesso!";
+
+    formMangas.reset();
+}
+
+// Ativar cadastro
+if (formMangas) {
+    formMangas.addEventListener("submit", cadastrarManga);
+}
+
+// Mostrar mangás ao abrir o site
+if (resultado) {
+    mostrarMangas();
+}
