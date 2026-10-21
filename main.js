@@ -1,5 +1,4 @@
-
-// BUSCA DE MANGÁS COM A API OPEN LIBRARY
+const API_URL = "http://127.0.0.1:5000/mangas";
 
 const formBusca = document.getElementById("formBusca");
 const campoBusca = document.getElementById("nomeManga");
@@ -7,7 +6,6 @@ const listaMangas = document.getElementById("mangas");
 const mensagemBusca = document.getElementById("mensagemBusca");
 const botaoBuscar = document.getElementById("botaoBuscar");
 
-// Buscar mangás na API
 async function buscarMangas(evento) {
     evento.preventDefault();
 
@@ -16,7 +14,7 @@ async function buscarMangas(evento) {
     listaMangas.innerHTML = "";
     mensagemBusca.textContent = "";
 
-    if (nome === "") {
+    if (!nome) {
         mensagemBusca.textContent = "Digite o nome de um mangá!";
         return;
     }
@@ -26,186 +24,201 @@ async function buscarMangas(evento) {
     mensagemBusca.textContent = "Procurando mangás...";
 
     try {
-        // Nova API: Open Library
-        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(nome)}&fields=key,title,author_name,cover_i,first_publish_year&limit=6`;
+        const url =
+            `https://openlibrary.org/search.json?title=${encodeURIComponent(nome)}&fields=key,title,author_name,cover_i,first_publish_year&limit=6`;
 
         const resposta = await fetch(url);
 
         if (!resposta.ok) {
-            throw new Error("Erro na requisição");
+            throw new Error("Erro na pesquisa.");
         }
 
-        // Converter a resposta em JSON
         const dados = await resposta.json();
 
-        listaMangas.innerHTML = "";
-        mensagemBusca.textContent = "";
-
-        // Verificar se encontrou resultados
         if (!dados.docs || dados.docs.length === 0) {
             mensagemBusca.textContent = "Nenhum mangá encontrado!";
             return;
         }
 
-        // Criar os cards
         dados.docs.forEach(manga => {
             const card = document.createElement("div");
             card.classList.add("card-manga");
 
-            // Capa
             if (manga.cover_i) {
                 const imagem = document.createElement("img");
-
-                imagem.src = `https://covers.openlibrary.org/b/id/${manga.cover_i}-M.jpg`;
+                imagem.src =
+                    `https://covers.openlibrary.org/b/id/${manga.cover_i}-M.jpg`;
                 imagem.alt = `Capa de ${manga.title}`;
                 imagem.loading = "lazy";
-
                 card.appendChild(imagem);
             }
 
-            // Título
             const titulo = document.createElement("h3");
             titulo.textContent = manga.title;
 
-            // Autor
             const autor = document.createElement("p");
-            autor.textContent = "Autor: " +
-                (manga.author_name?.join(", ") || "Não informado");
+            autor.textContent =
+                "Autor: " + (manga.author_name?.join(", ") || "Não informado");
 
-            // Ano
             const ano = document.createElement("p");
-            ano.textContent = "Ano: " +
-                (manga.first_publish_year || "Não informado");
+            ano.textContent =
+                "Ano: " + (manga.first_publish_year || "Não informado");
 
-            card.appendChild(titulo);
-            card.appendChild(autor);
-            card.appendChild(ano);
-
+            card.append(titulo, autor, ano);
             listaMangas.appendChild(card);
         });
 
-    } catch (erro) {
-        console.error("Erro na API:", erro);
+        mensagemBusca.textContent = "";
 
+    } catch (erro) {
+        console.error("Erro na busca:", erro);
         mensagemBusca.textContent =
             "Não foi possível realizar a pesquisa. Tente novamente.";
 
     } finally {
-        // Ativar o botão novamente
         botaoBuscar.disabled = false;
         botaoBuscar.textContent = "Buscar mangás";
     }
 }
 
-// Ativar busca
 if (formBusca) {
     formBusca.addEventListener("submit", buscarMangas);
 }
 
 
-// CADASTRO DE MANGÁS
+// ========================================
+// CADASTRO E LISTAGEM PELA API FLASK
+// ========================================
 
 const formMangas = document.getElementById("formMangas");
 const resultado = document.getElementById("resultado");
 const mensagemCadastro = document.getElementById("mensagemCadastro");
 
-// Recuperar mangás salvos
-let mangasCadastrados = [];
 
-try {
-    mangasCadastrados = JSON.parse(
-        localStorage.getItem("mangasCadastrados") || "[]"
-    );
-} catch (erro) {
-    console.error("Erro ao carregar mangás:", erro);
-    mangasCadastrados = [];
-}
+// Buscar os mangás armazenados no MySQL
+async function carregarMangas() {
+    if (!resultado) return;
 
-// Salvar mangás no navegador
-function salvarMangas() {
-    localStorage.setItem(
-        "mangasCadastrados",
-        JSON.stringify(mangasCadastrados)
-    );
-}
+    resultado.textContent = "Carregando mangás...";
 
-// Mostrar mangás cadastrados
-function mostrarMangas() {
-    if (!resultado) {
-        return;
-    }
+    try {
+        const resposta = await fetch(API_URL);
 
-    resultado.innerHTML = "";
+        if (!resposta.ok) {
+            throw new Error("Não foi possível carregar os mangás.");
+        }
 
-    if (mangasCadastrados.length === 0) {
-        resultado.textContent = "Nenhum mangá cadastrado ainda.";
-        return;
-    }
+        const mangas = await resposta.json();
 
-    mangasCadastrados.forEach((manga, indice) => {
-        const card = document.createElement("div");
-        card.classList.add("manga-cadastrado");
+        resultado.innerHTML = "";
 
-        const titulo = document.createElement("h3");
-        titulo.textContent = manga.nome;
+        if (mangas.length === 0) {
+            resultado.textContent = "Nenhum mangá cadastrado ainda.";
+            return;
+        }
 
-        const autor = document.createElement("p");
-        autor.textContent = `Autor: ${manga.autor}`;
+        mangas.forEach(manga => {
+            const card = document.createElement("div");
+            card.classList.add("manga-cadastrado");
 
-        const genero = document.createElement("p");
-        genero.textContent = `Gênero: ${manga.genero}`;
+            const titulo = document.createElement("h3");
+            titulo.textContent = manga.nome;
 
-        const volumes = document.createElement("p");
-        volumes.textContent = `Volumes: ${manga.volumes}`;
+            const autor = document.createElement("p");
+            autor.textContent = `Autor: ${manga.autor}`;
 
-        // Botão excluir
-        const botaoExcluir = document.createElement("button");
-        botaoExcluir.textContent = "Excluir";
-        botaoExcluir.classList.add("botao-excluir");
+            const genero = document.createElement("p");
+            genero.textContent = `Gênero: ${manga.genero}`;
 
-        botaoExcluir.addEventListener("click", () => {
-            mangasCadastrados.splice(indice, 1);
-            salvarMangas();
-            mostrarMangas();
+            const volumes = document.createElement("p");
+            volumes.textContent = `Volumes: ${manga.volumes}`;
+
+            card.append(titulo, autor, genero, volumes);
+            resultado.appendChild(card);
         });
 
-        card.appendChild(titulo);
-        card.appendChild(autor);
-        card.appendChild(genero);
-        card.appendChild(volumes);
-        card.appendChild(botaoExcluir);
-
-        resultado.appendChild(card);
-    });
+    } catch (erro) {
+        console.error("Erro ao carregar mangás:", erro);
+        resultado.textContent =
+            "Erro ao carregar os mangás. Confira se a API Flask está ligada.";
+    }
 }
 
-// Cadastrar um mangá
-function cadastrarManga(evento) {
+
+// Enviar um novo mangá para a API
+async function cadastrarManga(evento) {
     evento.preventDefault();
 
     const manga = {
         nome: document.getElementById("nome").value.trim(),
         autor: document.getElementById("autor").value.trim(),
         genero: document.getElementById("genero").value.trim(),
-        volumes: document.getElementById("volumes").value
+        volumes: Number(document.getElementById("volumes").value)
     };
 
-    mangasCadastrados.push(manga);
+    if (
+        !manga.nome ||
+        !manga.autor ||
+        !manga.genero ||
+        !Number.isInteger(manga.volumes) ||
+        manga.volumes < 1
+    ) {
+        mensagemCadastro.textContent =
+            "Preencha todos os campos corretamente.";
+        return;
+    }
 
-    salvarMangas();
-    mostrarMangas();
+    const botao = formMangas.querySelector('button[type="submit"]');
+    botao.disabled = true;
+    mensagemCadastro.textContent = "Cadastrando mangá...";
 
-    mensagemCadastro.textContent = "Mangá cadastrado com sucesso!";
+    try {
+        // LOG 1: conferir os dados que serão enviados
+        console.log("Enviando mangá:", manga);
 
-    formMangas.reset();
+        const resposta = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(manga)
+        });
+
+        // LOG 2: conferir o status HTTP
+        console.log("Status HTTP:", resposta.status);
+
+        const dados = await resposta.json();
+
+        // LOG 3: conferir a resposta recebida do Flask
+        console.log("Resposta do Flask:", dados);
+
+        if (!resposta.ok) {
+            throw new Error(dados.erro || "Erro ao cadastrar o mangá.");
+        }
+
+        mensagemCadastro.textContent =
+            "Mangá cadastrado com sucesso!";
+
+        formMangas.reset();
+
+        // Atualiza a listagem sem recarregar a página
+        await carregarMangas();
+
+    } catch (erro) {
+        console.error("Erro no cadastro:", erro);
+
+        mensagemCadastro.textContent =
+            `Não foi possível cadastrar: ${erro.message}`;
+
+    } finally {
+        botao.disabled = false;
+    }
 }
 
-// Ativar cadastro
 if (formMangas) {
     formMangas.addEventListener("submit", cadastrarManga);
 }
 
-// Mostrar mangás ao abrir o site
-if (resultado) {
-    mostrarMangas();
-}
+
+// Carregar a listagem ao abrir a página
+carregarMangas();
